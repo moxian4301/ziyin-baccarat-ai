@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>紫音 Baccarat AI｜牌靴分析工作台</title>
+<style>
+:root{color-scheme:dark;--bg:#0d0b14;--panel:#171321;--panel2:#211a30;--line:#3a304b;--txt:#f5f0ff;--muted:#b5a9c8;--purple:#a98be8;--cyan:#7dd8d0;--gold:#e8c57c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 45% -15%,#382650 0,#0d0b14 55%);color:var(--txt);font:14px system-ui,-apple-system,"Noto Sans TC",sans-serif}
+main{max-width:1180px;margin:auto;padding:22px 15px 45px}.head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.brand{font-weight:800;letter-spacing:.5px;font-size:21px}.brand b{color:var(--purple)}.muted{color:var(--muted)}.small{font-size:12px}.pill{border:1px solid var(--line);padding:6px 10px;border-radius:999px;color:var(--cyan);font-size:12px}
+.layout{display:grid;grid-template-columns:1.35fr .85fr;gap:14px;margin-top:18px}.panel{background:#171321ed;border:1px solid var(--line);border-radius:17px;padding:16px;margin-bottom:14px;box-shadow:0 12px 35px #0003}
+h2{font-size:16px;margin:0 0 13px}.row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.between{justify-content:space-between}
+select,button,.upload{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:9px 12px;border-radius:10px;font:inherit}button{cursor:pointer}button:hover,.upload:hover{border-color:var(--purple)}button:disabled{opacity:.35;cursor:not-allowed}.primary{background:#60468e;border-color:#8e6cc3}.soft{background:#2b223a}.danger{color:#ffb7bd}.tabs button.active{background:#60468e;border-color:#a98be8}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.metric{background:var(--panel2);border-radius:12px;padding:11px}.metric strong{display:block;font-size:22px}.metric span{color:var(--muted);font-size:11px}
+.progress{height:7px;background:#342a43;border-radius:9px;overflow:hidden;margin-top:9px}.progress i{height:100%;display:block;background:linear-gradient(90deg,#8061b8,#bda5f0)}
+.entry{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:12px}.rank{font-size:17px;font-weight:700;padding:12px 2px;text-align:center;background:linear-gradient(160deg,#302541,#211a30);border:1px solid #514064;border-radius:11px}.rank small{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:3px}
+.table{display:grid;grid-template-columns:1fr 1fr;gap:10px}.side{border:1px solid var(--line);border-radius:13px;padding:12px;background:#201a2c}.side h3{margin:0 0 8px;font-size:13px;color:var(--muted)}.cards{display:flex;gap:6px;min-height:55px;align-items:center;flex-wrap:wrap}.playing{background:#f7f2ff;color:#21172f;border-radius:8px;padding:8px 10px;font-weight:800;font-size:18px;min-width:35px;text-align:center}.empty{font-size:12px;color:#756b82}
+.history{display:flex;gap:5px;flex-wrap:wrap;min-height:30px}.result{width:27px;height:27px;border-radius:50%;display:grid;place-items:center;border:1px solid currentColor;font-weight:700;font-size:11px}.P{color:#79aaff}.B{color:#ff8c9b}.T{color:#79d8b0}
+.odds{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.odd{background:var(--panel2);border-radius:12px;padding:12px}.odd strong{display:block;font-size:20px}.odd span{font-size:12px;color:var(--muted)}
+.note{border-left:3px solid var(--gold);background:#292237;padding:11px 12px;border-radius:8px;color:#d4c9e2;font-size:12px;line-height:1.6}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:7px 4px;border-bottom:1px solid #342a43}td:last-child,th:last-child{text-align:right}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.entry{grid-template-columns:repeat(5,1fr)}main{padding:16px 10px 35px}}
+</style></head>
+<body><main>
+<header class="head"><div><div class="brand">✦ 紫音 <b>BACCARAT AI</b></div><div class="muted small">跨平台牌靴紀錄・機率研究工作台 Prototype 0.2</div></div><span class="pill">本機運作｜不連接博彩帳號</span></header>
+<div class="layout">
+<div>
+<section class="panel">
+<div class="row between"><h2>牌靴控制台</h2><div class="row"><label class="muted small">牌副數</label><select id="decks"><option value="unknown">未知／待確認</option><option value="8">8 副</option><option value="6">6 副</option></select><button id="newShoe" class="primary">＋ 新牌靴</button></div></div>
+<div class="metrics">
+<div class="metric"><strong id="round">0</strong><span>已完成局數</span></div><div class="metric"><strong id="seen">0</strong><span>已記錄牌數</span></div><div class="metric"><strong id="remaining">416</strong><span>估計剩餘張數</span></div><div class="metric"><strong id="count">0</strong><span>Hi-Lo 示範計數</span></div>
+</div><div class="row between" style="margin-top:12px"><span class="muted small">已記錄牌靴比例</span><b id="percent">0%</b></div><div class="progress"><i id="bar" style="width:0%"></i></div>
+<div class="row" style="margin-top:13px"><button id="burn" class="soft">標記燒牌</button><span class="muted small" id="burnStatus">尚未記錄燒牌</span></div>
+</section>
+<section class="panel">
+<div class="row between"><h2>牌面輸入</h2><span class="muted small" id="turnLabel">發牌順序：閒 → 莊 → 閒 → 莊</span></div>
+<div class="table">
+<div class="side"><h3>閒家 <b id="playerScore">—</b></h3><div class="cards" id="playerCards"><span class="empty">等待輸入</span></div></div>
+<div class="side"><h3>莊家 <b id="bankerScore">—</b></h3><div class="cards" id="bankerCards"><span class="empty">等待輸入</span></div></div>
+</div>
+<div class="entry" id="ranks"></div>
+<div class="actions"><button id="undo">復原上一張</button><button id="finish" class="primary" disabled>完成本局</button><button id="clearHand">清除本局輸入</button></div>
+<p class="muted small">依序輸入：閒第 1 張、莊第 1 張、閒第 2 張、莊第 2 張；如有補牌，再輸入補牌方的第三張。</p>
+</section>
+<section class="panel">
+<div class="row between"><h2>路單紀錄</h2><span class="muted small">只記錄已完成的莊／閒／和結果</span></div><div class="history" id="road"><span class="empty">尚無已完成局數</span></div>
+</section>
+</div>
+<div>
+<section class="panel">
+<h2>即時牌型統計</h2><table><thead><tr><th>牌面</th><th>已出現</th><th>剩餘估計</th></tr></thead><tbody id="counts"></tbody></table>
+</section>
+<section class="panel">
+<h2>機率分析區</h2>
+<div class="odds"><div class="odd"><span>閒勝</span><strong>—</strong><span>待引擎驗證</span></div><div class="odd"><span>和局</span><strong>—</strong><span>待引擎驗證</span></div><div class="odd"><span>莊勝</span><strong>—</strong><span>待引擎驗證</span></div></div>
+<p class="muted small" style="margin-top:10px">下一階段接入精確枚舉／蒙地卡羅模擬，依剩餘牌組與標準補牌規則計算機率、抽水後 EV 及估計誤差。</p>
+</section>
+<section class="panel">
+<h2>影像讀牌入口</h2><div class="row"><label class="upload" for="image">匯入牌桌截圖／拍照</label><input id="image" type="file" accept="image/*" capture="environment" hidden></div><img id="preview" style="display:none;max-width:100%;max-height:230px;border-radius:10px;margin-top:12px"><p class="muted small">目前為影像匯入入口。自動定位牌桌、辨識牌面、重複畫面去重與多平台版面設定，列入下一階段。</p>
+</section>
+<div class="note"><b>研究誠實標示：</b>本原型不會把 Hi-Lo 示範計數當成百家樂勝率訊號，也不會輸出未經驗證的下注建議。牌副數未知時，剩餘牌張數只是暫定估算；須確認牌靴規格與洗牌／切牌方式後才能做正式機率分析。</div>
+</div>
+</div></main>
+<script>
+const ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];let seen=[],hand=[],road=[],burned=0;
+const $=x=>document.getElementById(x);const deckCount=()=> $('decks').value==='6'?6:8;const total=()=>deckCount()*52;const cardCount=r=>seen.filter(x=>x.r===r).length;
+function hi(r){return ['2','3','4','5','6'].includes(r)?1:(['10','J','Q','K','A'].includes(r)?-1:0)}
+function points(r){return ['10','J','Q','K'].includes(r)?0:r==='A'?1:Number(r)}
+function score(side){return hand.filter(x=>x.side===side).reduce((s,x)=>s+points(x.r),0)%10}
+function nextSide(){if(hand.length===0)return 'P';if(hand.length===1)return 'B';if(hand.length===2)return 'P';if(hand.length===3)return 'B';let p=hand.filter(x=>x.side==='P').length,b=hand.filter(x=>x.side==='B').length;return p<=b?'P':'B'}
+function add(r){if(cardCount(r)>=deckCount()*4)return;let side=nextSide();hand.push({r,side});seen.push({r,side,kind:'hand'});render()}
+function render(){
+let n=deckCount(),t=total(),cnt=seen.length+burned,run=seen.reduce((s,x)=>s+hi(x.r),0);
+$('round').textContent=road.length;$('seen').textContent=cnt;$('remaining').textContent=Math.max(0,t-cnt);$('count').textContent=(run>0?'+':'')+run;
+let pct=Math.min(100,cnt/t*100);$('percent').textContent=pct.toFixed(1)+'%';$('bar').style.width=pct+'%';
+$('burnStatus').textContent=burned?`已標記 ${burned} 張燒牌（未輸入牌值）`:'尚未記錄燒牌';
+$('playerCards').innerHTML=hand.filter(x=>x.side==='P').map(x=>`<span class="playing">${x.r}</span>`).join('')||'<span class="empty">等待輸入</span>';
+$('bankerCards').innerHTML=hand.filter(x=>x.side==='B').map(x=>`<span class="playing">${x.r}</span>`).join('')||'<span class="empty">等待輸入</span>';
+$('playerScore').textContent=hand.some(x=>x.side==='P')?score('P')+' 點':'—';$('bankerScore').textContent=hand.some(x=>x.side==='B')?score('B')+' 點':'—';
+$('finish').disabled=hand.length<4;
+$('turnLabel').textContent=hand.length<4?['閒家第 1 張','莊家第 1 張','閒家第 2 張','莊家第 2 張'][hand.length]:'補牌階段：請依實際牌局輸入補牌';
+$('counts').innerHTML=ranks.map(r=>{let used=cardCount(r),left=n*4-used;return `<tr><td>${r}</td><td>${used}</td><td>${left}</td></tr>`}).join('');
+$('road').innerHTML=road.length?road.map(x=>`<span class="result ${x}">${x}</span>`).join(''):'<span class="empty">尚無已完成局數</span>';
+$('ranks').innerHTML=ranks.map(r=>`<button class="rank" data-r="${r}" ${cardCount(r)>=n*4?'disabled':''}>${r}<small>剩 ${n*4-cardCount(r)}</small></button>`).join('');
+$('ranks').querySelectorAll('button').forEach(b=>b.onclick=()=>add(b.dataset.r));
+}
+$('undo').onclick=()=>{if(!hand.length)return;let x=hand.pop();let i=seen.findLastIndex(y=>y.kind==='hand'&&y.r===x.r);if(i>=0)seen.splice(i,1);render()};
+$('clearHand').onclick=()=>{if(!hand.length)return;let n=hand.length;hand=[];for(let i=0;i<n;i++){let i2=seen.findLastIndex(y=>y.kind==='hand');if(i2>=0)seen.splice(i2,1)}render()};
+$('finish').onclick=()=>{if(hand.length<4)return;let p=score('P'),b=score('B');road.push(p>b?'P':b>p?'B':'T');hand=[];render()};
+$('burn').onclick=()=>{burned++;render()};
+$('newShoe').onclick=()=>{if(confirm('開始新牌靴？目前牌靴紀錄將清空。')){seen=[];hand=[];road=[];burned=0;render()}};
+$('decks').onchange=render;
+$('image').onchange=e=>{let f=e.target.files[0];if(!f)return;let im=$('preview');im.src=URL.createObjectURL(f);im.style.display='block'};
+render();
+</script></body></html>
