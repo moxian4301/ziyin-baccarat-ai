@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>紫音 Baccarat AI｜牌靴分析工作台 v0.6</title>
+<title>紫音 Baccarat AI｜即時畫面擷取 v0.7.1</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0d0b14;--panel:#171321;--panel2:#211a30;--line:#3a304b;--txt:#f5f0ff;--muted:#b5a9c8;--purple:#a98be8;--cyan:#7dd8d0;--gold:#e8c57c}
@@ -20,10 +20,16 @@ select,button,.upload{background:var(--panel2);border:1px solid var(--line);colo
 .note{border-left:3px solid var(--gold);background:#292237;padding:11px 12px;border-radius:8px;color:#d4c9e2;font-size:12px;line-height:1.6}
 table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:7px 4px;border-bottom:1px solid #342a43}td:last-child,th:last-child{text-align:right}
 .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.video-frame{background:#09070d;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:190px;display:grid;place-items:center}
+.video-frame video{display:block;width:100%;max-height:430px;object-fit:contain;background:#09070d}
+.capture-placeholder{padding:30px 12px;text-align:center;color:var(--muted)}
+.capture-status{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:5px 9px;font-size:12px;color:var(--muted)}
+.capture-dot{width:7px;height:7px;border-radius:50%;background:#887d96}
+.capture-dot.live{background:#70d8a7;box-shadow:0 0 9px #70d8a7}
 @media(max-width:760px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.entry{grid-template-columns:repeat(5,1fr)}main{padding:16px 10px 35px}}
 </style></head>
 <body><main>
-<header class="head"><div><div class="brand">✦ 紫音 <b>BACCARAT AI</b></div><div class="muted small">跨平台牌靴紀錄・機率研究工作台 Prototype 0.6</div></div><span class="pill">本機運作｜不連接博彩帳號</span></header>
+<header class="head"><div><div class="brand">✦ 紫音 <b>BACCARAT AI</b></div><div class="muted small">跨平台牌靴紀錄・即時畫面擷取 Prototype 0.7.1</div></div><span class="pill">本機運作｜不連接博彩帳號</span></header>
 <div class="layout">
 <div>
 <section class="panel">
@@ -58,6 +64,19 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;p
 <div class="actions"><button id="analyze" class="primary">分析剩餘牌靴</button></div>
 <p id="recommendation" class="muted small" style="margin:10px 0 0">尚未分析。完成已知牌面紀錄後，可手動啟動模擬。</p>
 <p id="analysisMeta" class="muted small" style="margin-top:6px">模擬次數：30,000｜標準賠付假設：閒 1:1、莊 0.95:1、和 8:1。</p>
+</section>
+<section class="panel" id="liveCapturePanel">
+<div class="row between"><h2>即時螢幕畫面</h2><span class="capture-status"><i class="capture-dot" id="captureDot"></i><span id="captureState">尚未分享</span></span></div>
+<div class="video-frame" id="videoFrame">
+<div class="capture-placeholder" id="capturePlaceholder">按下「開始螢幕分享」，選擇正在播放的百家樂視窗或螢幕。<br><span class="small">目前階段只擷取與預覽畫面，尚未自動辨識牌面。</span></div>
+<video id="liveVideo" autoplay muted playsinline style="display:none"></video>
+</div>
+<div class="actions">
+<button id="startCapture" class="primary">開始螢幕分享</button>
+<button id="pauseCapture" disabled>暫停預覽</button>
+<button id="stopCapture" class="soft" disabled>停止分享</button>
+</div>
+<p id="captureStatus" class="muted small" style="margin:10px 0 0">電腦 Chrome／Edge 通常支援螢幕分享；手機瀏覽器是否支援，取決於作業系統與瀏覽器版本。分享時請選擇遊戲視窗或整個螢幕。</p>
 </section>
 <section class="panel">
 <h2>截圖 OCR 讀牌</h2>
@@ -141,6 +160,59 @@ function analyze(){
  $('analysisMeta').textContent=`模擬 ${N.toLocaleString()} 次｜各勝率最大標準誤約 ±${se.toFixed(2)} 個百分點｜已記錄 ${visible} 張｜未知燒牌 ${burned} 張｜${unknownDeck?'牌副數未知，暫按 8 副估算':'牌副數：'+n+' 副'}`;
 }
 $('analyze').onclick=analyze;
+
+// v0.7.1：使用者授權的即時螢幕擷取（此階段僅預覽，不自動讀牌）
+let captureStream=null,capturePaused=false;
+const liveVideo=$('liveVideo');
+function setCaptureUi(state,message){
+ $('captureState').textContent=state;
+ $('captureStatus').textContent=message;
+ $('captureDot').classList.toggle('live',state==='分享中');
+ $('startCapture').disabled=state==='分享中'||state==='已暫停';
+ $('pauseCapture').disabled=!(state==='分享中'||state==='已暫停');
+ $('pauseCapture').textContent=state==='已暫停'?'繼續預覽':'暫停預覽';
+ $('stopCapture').disabled=!(state==='分享中'||state==='已暫停');
+}
+async function startCapture(){
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+  setCaptureUi('不支援','目前瀏覽器沒有提供螢幕分享 API。請先用桌面版 Chrome 或 Edge 測試；iPhone App 畫面擷取需後續原生工具。');
+  return;
+ }
+ try{
+  captureStream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:10,max:15}},audio:false});
+  liveVideo.srcObject=captureStream;
+  liveVideo.style.display='block';
+  $('capturePlaceholder').style.display='none';
+  await liveVideo.play();
+  capturePaused=false;
+  const track=captureStream.getVideoTracks()[0];
+  if(track)track.addEventListener('ended',()=>stopCapture(true),{once:true});
+  setCaptureUi('分享中','正在顯示你授權分享的畫面。此版本尚未辨識牌面，也不會將畫面上傳。');
+ }catch(err){
+  const msg=err&&err.name==='NotAllowedError'?'你取消了螢幕分享，或尚未授權。':(err.message||'無法啟動螢幕分享。');
+  setCaptureUi('尚未分享',msg);
+ }
+}
+function pauseCapture(){
+ if(!captureStream)return;
+ capturePaused=!capturePaused;
+ captureStream.getVideoTracks().forEach(t=>t.enabled=!capturePaused);
+ liveVideo.style.opacity=capturePaused?'.35':'1';
+ setCaptureUi(capturePaused?'已暫停':'分享中',capturePaused?'預覽已暫停；按「繼續預覽」可恢復。':'正在顯示你授權分享的畫面。');
+}
+function stopCapture(endedByBrowser=false){
+ if(captureStream){captureStream.getTracks().forEach(t=>t.stop());captureStream=null}
+ liveVideo.pause();liveVideo.srcObject=null;liveVideo.style.display='none';liveVideo.style.opacity='1';
+ $('capturePlaceholder').style.display='block';
+ capturePaused=false;
+ setCaptureUi('尚未分享',endedByBrowser?'螢幕分享已由系統結束。':'已停止螢幕分享。');
+}
+$('startCapture').onclick=startCapture;
+$('pauseCapture').onclick=pauseCapture;
+$('stopCapture').onclick=()=>stopCapture(false);
+if(!window.isSecureContext){
+ setCaptureUi('需安全連線','螢幕分享通常需要 HTTPS 安全連線；請使用 GitHub Pages 網址開啟。');
+}
 
 // v0.5：牌靴資料自動保存、匯出與匯入
 function saveState(){
