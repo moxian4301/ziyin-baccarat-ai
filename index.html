@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>紫音 Baccarat AI｜即時畫面擷取 v0.7.1</title>
+<title>紫音 Baccarat AI｜雙模式辨識 Prototype v0.7.2</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#0d0b14;--panel:#171321;--panel2:#211a30;--line:#3a304b;--txt:#f5f0ff;--muted:#b5a9c8;--purple:#a98be8;--cyan:#7dd8d0;--gold:#e8c57c}
@@ -27,9 +27,12 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;p
 .capture-dot{width:7px;height:7px;border-radius:50%;background:#887d96}
 .capture-dot.live{background:#70d8a7;box-shadow:0 0 9px #70d8a7}
 @media(max-width:760px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.entry{grid-template-columns:repeat(5,1fr)}main{padding:16px 10px 35px}}
+
+.recognition-canvas{display:block;max-width:100%;max-height:360px;border:1px solid var(--line);border-radius:10px;background:#09070d;touch-action:none;cursor:crosshair}
+.mode-hint{border:1px solid var(--line);border-radius:10px;padding:10px;background:#211a30;color:var(--muted);font-size:12px;line-height:1.6}
 </style></head>
 <body><main>
-<header class="head"><div><div class="brand">✦ 紫音 <b>BACCARAT AI</b></div><div class="muted small">跨平台牌靴紀錄・即時畫面擷取 Prototype 0.7.1</div></div><span class="pill">本機運作｜不連接博彩帳號</span></header>
+<header class="head"><div><div class="brand">✦ 紫音 <b>BACCARAT AI</b></div><div class="muted small">跨平台牌靴紀錄・直播＋歷史辨識 Prototype 0.7.2</div></div><span class="pill">本機運作｜不連接博彩帳號</span></header>
 <div class="layout">
 <div>
 <section class="panel">
@@ -77,6 +80,39 @@ table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;p
 <button id="stopCapture" class="soft" disabled>停止分享</button>
 </div>
 <p id="captureStatus" class="muted small" style="margin:10px 0 0">電腦 Chrome／Edge 通常支援螢幕分享；手機瀏覽器是否支援，取決於作業系統與瀏覽器版本。分享時請選擇遊戲視窗或整個螢幕。</p>
+</section>
+<section class="panel" id="recognitionPanel">
+  <div class="row between"><h2>0.7.2 雙模式牌面辨識</h2><span class="pill">實驗功能</span></div>
+  <div class="row tabs" style="margin-bottom:10px">
+    <button id="liveModeBtn" class="active">直播辨識</button>
+    <button id="historyModeBtn">歷史牌局辨識</button>
+  </div>
+  <div id="liveModeBox">
+    <p class="muted small">從上方分享的遊戲畫面擷取目前畫面。先框選只包含牌面的區域，再執行辨識。直播模式會定時取樣；停止分享即可停止辨識。</p>
+    <div class="actions">
+      <button id="sampleLive" class="primary" disabled>擷取目前畫面</button>
+      <button id="autoLive" disabled>開始定時辨識</button>
+      <button id="stopAutoLive" disabled>停止定時辨識</button>
+    </div>
+  </div>
+  <div id="historyModeBox" style="display:none">
+    <p class="muted small">上傳你點開歷史局數後的牌面明細截圖。建議一次只處理一局，避免把介面文字誤認成牌面。</p>
+    <div class="row">
+      <label class="upload" for="historyImage">選擇歷史牌局截圖</label>
+      <input id="historyImage" type="file" accept="image/*" hidden>
+      <button id="recognizeHistory" class="primary" disabled>辨識這局</button>
+    </div>
+  </div>
+  <canvas id="recognitionCanvas" class="recognition-canvas" width="960" height="540" style="margin-top:12px"></canvas>
+  <div class="row" style="margin-top:9px">
+    <button id="setCropBtn" class="soft" disabled>框選牌面區域</button>
+    <button id="clearCropBtn" disabled>清除框選</button>
+    <button id="recognizeCropBtn" class="primary" disabled>辨識框選區域並匯入</button>
+  </div>
+  <p id="recognitionStatus" class="muted small" style="margin-top:9px">先開始螢幕分享或切換到歷史模式上傳截圖。辨識前請框選只包含牌面的區域。</p>
+  <div class="mode-hint" style="margin-top:9px">
+    <b>自動匯入規則：</b>僅將 OCR 信心度達 85% 的牌面候選匯入；每次最多 6 張，並以畫面辨識結果避免連續影格重複匯入。OCR 仍可能誤讀圖案或文字，請在牌靴統計中核對；目前屬於跨平台實驗原型，尚未保證支援所有網站／App 版型。
+  </div>
 </section>
 <section class="panel">
 <h2>截圖 OCR 讀牌</h2>
@@ -213,6 +249,109 @@ $('stopCapture').onclick=()=>stopCapture(false);
 if(!window.isSecureContext){
  setCaptureUi('需安全連線','螢幕分享通常需要 HTTPS 安全連線；請使用 GitHub Pages 網址開啟。');
 }
+
+
+// v0.7.2：直播影格／歷史截圖共用辨識入口（實驗原型）
+const recCanvas=$('recognitionCanvas'), recCtx=recCanvas.getContext('2d');
+let recSource=null, recImage=null, cropRect=null, drawingCrop=false, cropStart=null;
+let liveTimer=null,lastAutoSignature='',historyFileUrl=null;
+function setRecSource(source){
+  recSource=source;
+  $('setCropBtn').disabled=!source;
+  $('clearCropBtn').disabled=!cropRect;
+  $('recognizeCropBtn').disabled=!source||!cropRect;
+  $('sampleLive').disabled=!(captureStream&&liveVideo.readyState>=2);
+  $('autoLive').disabled=!(captureStream&&liveVideo.readyState>=2)||!!liveTimer;
+  $('stopAutoLive').disabled=!liveTimer;
+}
+function drawRecSource(){
+  if(!recSource)return;
+  const w=recSource.videoWidth||recSource.naturalWidth||recSource.width||960;
+  const h=recSource.videoHeight||recSource.naturalHeight||recSource.height||540;
+  const scale=Math.min(960/w,540/h,1), cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+  recCanvas.width=cw;recCanvas.height=ch;recCtx.clearRect(0,0,cw,ch);recCtx.drawImage(recSource,0,0,cw,ch);
+  if(cropRect){recCtx.strokeStyle='#7dd8d0';recCtx.lineWidth=3;recCtx.setLineDash([7,4]);recCtx.strokeRect(cropRect.x,cropRect.y,cropRect.w,cropRect.h);recCtx.setLineDash([])}
+}
+function snapshotLive(){
+  if(!captureStream||liveVideo.readyState<2){$('recognitionStatus').textContent='請先開始螢幕分享，並等待畫面出現。';return}
+  recSource=liveVideo;cropRect=null;drawRecSource();setRecSource(recSource);
+  $('recognitionStatus').textContent='已擷取直播畫面。請按「框選牌面區域」，用滑鼠拖曳框住莊／閒牌面。';
+}
+$('sampleLive').onclick=snapshotLive;
+$('liveModeBtn').onclick=()=>{
+  $('liveModeBtn').classList.add('active');$('historyModeBtn').classList.remove('active');
+  $('liveModeBox').style.display='block';$('historyModeBox').style.display='none';
+  $('recognitionStatus').textContent='直播模式：請先在上方開始螢幕分享，再擷取目前畫面。';
+};
+$('historyModeBtn').onclick=()=>{
+  $('historyModeBtn').classList.add('active');$('liveModeBtn').classList.remove('active');
+  $('historyModeBox').style.display='block';$('liveModeBox').style.display='none';
+  $('recognitionStatus').textContent='歷史模式：上傳點開歷史局數後的牌面明細截圖。';
+};
+$('historyImage').onchange=e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  if(historyFileUrl)URL.revokeObjectURL(historyFileUrl);
+  historyFileUrl=URL.createObjectURL(f);const im=new Image();
+  im.onload=()=>{recSource=im;cropRect=null;drawRecSource();setRecSource(recSource);$('recognitionStatus').textContent='歷史截圖已載入。請框選牌面區域，再執行辨識。'};
+  im.onerror=()=>$('recognitionStatus').textContent='圖片載入失敗，請換一張截圖。';
+  im.src=historyFileUrl;$('recognizeHistory').disabled=false;
+};
+$('recognizeHistory').onclick=()=>{if(recSource){$('historyModeBtn').click();$('recognitionStatus').textContent='已載入歷史牌局。請框選牌面區域，再按「辨識框選區域並匯入」。';}};
+$('setCropBtn').onclick=()=>{$('recognitionStatus').textContent='請在畫面上按住滑鼠左鍵並拖曳，框住牌面區域。';drawingCrop=true;};
+$('clearCropBtn').onclick=()=>{cropRect=null;drawRecSource();setRecSource(recSource);};
+recCanvas.addEventListener('pointerdown',e=>{
+  if(!drawingCrop)return;const r=recCanvas.getBoundingClientRect();
+  cropStart={x:(e.clientX-r.left)*recCanvas.width/r.width,y:(e.clientY-r.top)*recCanvas.height/r.height};
+  recCanvas.setPointerCapture(e.pointerId);
+});
+recCanvas.addEventListener('pointerup',e=>{
+  if(!drawingCrop||!cropStart)return;const r=recCanvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)*recCanvas.width/r.width,y=(e.clientY-r.top)*recCanvas.height/r.height;
+  cropRect={x:Math.max(0,Math.min(cropStart.x,x)),y:Math.max(0,Math.min(cropStart.y,y)),w:Math.abs(x-cropStart.x),h:Math.abs(y-cropStart.y)};
+  cropStart=null;drawingCrop=false;
+  if(cropRect.w<12||cropRect.h<12){cropRect=null;$('recognitionStatus').textContent='框選範圍太小，請重新框選。';}
+  else $('recognitionStatus').textContent='牌面區域已框選。確認框內沒有路單、賠率或其他文字，再開始辨識。';
+  drawRecSource();setRecSource(recSource);
+});
+function getCropCanvas(){
+  if(!recSource||!cropRect)return null;
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(cropRect.w));c.height=Math.max(1,Math.round(cropRect.h));
+  c.getContext('2d').drawImage(recCanvas,cropRect.x,cropRect.y,cropRect.w,cropRect.h,0,0,c.width,c.height);return c;
+}
+async function recognizeCurrentCrop(auto=false){
+  const c=getCropCanvas();if(!c)return;
+  if(!window.Tesseract){$('recognitionStatus').textContent='OCR 引擎載入失敗，請確認網路後重新整理。';return}
+  $('recognizeCropBtn').disabled=true;$('recognitionStatus').textContent='正在辨識框選區域…';
+  try{
+    const result=await Tesseract.recognize(c,'eng');
+    const words=(result.data.words||[]).filter(w=>(w.confidence||0)>=85)
+      .sort((a,b)=>(a.bbox?.x0||0)-(b.bbox?.x0||0));
+    const found=[];
+    for(const w of words){
+      const parts=String(w.text||'').toUpperCase().match(/10|[A-Z0-9]+/g)||[];
+      for(const part of parts){const rank=normalizeOcrToken(part);if(rank)found.push({rank,confidence:w.confidence||0})}
+    }
+    const unique=found.slice(0,6),signature=unique.map(x=>x.rank).join('-');
+    if(!unique.length){$('recognitionStatus').textContent='沒有找到信心度達 85% 的牌面候選。請放大牌角、縮小框選範圍或改用清晰截圖。';return}
+    if(auto&&signature===lastAutoSignature){$('recognitionStatus').textContent='畫面與上一個取樣相同，已略過，避免重複匯入。';return}
+    // One successful recognition batch is added in detected left-to-right order.
+    unique.forEach(x=>add(x.rank));lastAutoSignature=signature;
+    $('recognitionStatus').textContent=`辨識候選 ${unique.map(x=>x.rank).join('、')}（信心度均 ≥85%），已嘗試匯入 ${unique.length} 張。請核對牌靴與局數。`;
+  }catch(err){$('recognitionStatus').textContent='辨識失敗：'+(err.message||'未知錯誤')}
+  finally{$('recognizeCropBtn').disabled=!(recSource&&cropRect)}
+}
+$('recognizeCropBtn').onclick=()=>recognizeCurrentCrop(false);
+$('autoLive').onclick=()=>{
+  if(!captureStream||!recSource){snapshotLive();if(!recSource)return}
+  if(!cropRect){$('recognitionStatus').textContent='請先擷取畫面並框選牌面區域。';return}
+  liveTimer=setInterval(()=>{if(captureStream&&!capturePaused){drawRecSource();recognizeCurrentCrop(true)}},2500);
+  setRecSource(recSource);$('recognitionStatus').textContent='直播定時辨識已啟動，每 2.5 秒取樣一次。';
+};
+$('stopAutoLive').onclick=()=>{if(liveTimer)clearInterval(liveTimer);liveTimer=null;setRecSource(recSource);$('recognitionStatus').textContent='已停止定時辨識。'};
+const oldStopCapture=stopCapture;
+stopCapture=function(endedByBrowser=false){if(liveTimer){clearInterval(liveTimer);liveTimer=null}oldStopCapture(endedByBrowser);setRecSource(recSource)};
+const oldStartCapture=startCapture;
+startCapture=async function(){await oldStartCapture();setTimeout(()=>{if(captureStream){$('sampleLive').disabled=false;$('autoLive').disabled=!!liveTimer}},500)};
 
 // v0.5：牌靴資料自動保存、匯出與匯入
 function saveState(){
